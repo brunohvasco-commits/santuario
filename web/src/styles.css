@@ -223,8 +223,24 @@ legend { font-family: var(--hand); color: var(--bronze-hi); margin-bottom: 0.45r
 .piece-wrap { width: 76%; aspect-ratio: 1; display: grid; place-items: center; pointer-events: none; }
 .piece { width: 100%; height: 100%; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.45)); }
 .piece.master { width: 112%; height: 112%; }
-.piece-wrap.arrive { animation: arrive 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
-@keyframes arrive { from { transform: scale(0.6) translateY(-14%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.grid { overflow: visible; }
+.cell.landing { z-index: 3; }
+.cell .piece-wrap { grid-area: 1 / 1; }
+/* a peça desliza da casa de origem até o destino, erguendo-se no meio do caminho */
+.piece-wrap.fly { animation: piece-fly 0.7s cubic-bezier(0.45, 0.05, 0.25, 1) both; will-change: transform; }
+@keyframes piece-fly {
+  0%   { transform: translate(calc(var(--dx) * 131.6%), calc(var(--dy) * 131.6%)) scale(1); }
+  12%  { transform: translate(calc(var(--dx) * 118%), calc(var(--dy) * 118% - 6%)) scale(1.1); filter: drop-shadow(0 10px 8px rgba(0, 0, 0, 0.4)); }
+  55%  { transform: translate(calc(var(--dx) * 52%), calc(var(--dy) * 52% - 16%)) scale(1.2); filter: drop-shadow(0 18px 14px rgba(0, 0, 0, 0.45)); }
+  88%  { transform: translate(0, -3%) scale(1.04); }
+  100% { transform: none; }
+}
+/* peça capturada some aos poucos quando o atacante chega */
+.piece-wrap.captured-ghost { animation: captured 0.75s ease-in both; pointer-events: none; }
+@keyframes captured {
+  0%, 55% { opacity: 1; transform: none; filter: none; }
+  100% { opacity: 0; transform: scale(0.55) rotate(-25deg); filter: blur(2px) grayscale(1); }
+}
 
 /* cartas */
 .card {
@@ -247,6 +263,22 @@ button.card { cursor: pointer; }
 .card.flipped.fresh { animation: fresh-flipped 1.2s ease-out; }
 @keyframes fresh { 0% { box-shadow: 0 0 0 3px var(--gold), 0 0 30px rgba(240, 210, 143, 0.9); } }
 @keyframes fresh-flipped { 0% { box-shadow: 0 0 0 3px var(--gold), 0 0 30px rgba(240, 210, 143, 0.9); } }
+/* troca de cartas: voo em 3D com um degradê de luz atravessando a carta */
+.card.flying { z-index: 30; transition: none; }
+.card.flying::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 228, 160, 0) 35%, rgba(255, 228, 160, 0.65) 50%, rgba(255, 228, 160, 0) 65%, transparent 80%);
+  background-size: 260% 100%; mix-blend-mode: screen;
+  animation: sheen 1.2s ease-in-out both;
+}
+.card.flying img {
+  -webkit-mask-image: linear-gradient(100deg, #000 35%, rgba(0, 0, 0, 0.25) 50%, #000 65%);
+  mask-image: linear-gradient(100deg, #000 35%, rgba(0, 0, 0, 0.25) 50%, #000 65%);
+  -webkit-mask-size: 300% 100%; mask-size: 300% 100%;
+  animation: dissolve 1.2s ease-in-out both;
+}
+@keyframes sheen { from { background-position: 130% 0; } to { background-position: -30% 0; } }
+@keyframes dissolve { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
 .card-seal { position: absolute; top: 6%; right: 3.5%; width: 9%; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
 .card-seal.red { background: var(--red); }
 .card-seal.blue { background: var(--blue); }

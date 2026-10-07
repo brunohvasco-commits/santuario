@@ -10,9 +10,10 @@ interface Props {
   size?: 'lg' | 'md' | 'sm';
   onClick?: () => void;
   label?: string;
+  noTrack?: boolean; // não participa da animação de troca
 }
 
-export function Card({ id, flipped, selected, playable, dim, fresh, size = 'md', onClick, label }: Props) {
+export function Card({ id, flipped, selected, playable, dim, fresh, size = 'md', onClick, label, noTrack }: Props) {
   if (!id) return <div className={`card card-${size} card-empty`} />;
   const c = CARDS[id];
   const cls = ['card', `card-${size}`, flipped && 'flipped', selected && 'selected', playable && 'playable', dim && 'dim', fresh && 'fresh']
@@ -25,11 +26,11 @@ export function Card({ id, flipped, selected, playable, dim, fresh, size = 'md',
     </>
   );
   return onClick ? (
-    <button type="button" className={cls} onClick={onClick} aria-pressed={selected} aria-label={label ?? `Carta ${c.name}`}>
+    <button type="button" data-card={noTrack ? undefined : id} className={cls} onClick={onClick} aria-pressed={selected} aria-label={label ?? `Carta ${c.name}`}>
       {content}
     </button>
   ) : (
-    <div className={cls} aria-label={label ?? `Carta ${c.name}`}>{content}</div>
+    <div data-card={noTrack ? undefined : id} className={cls} aria-label={label ?? `Carta ${c.name}`}>{content}</div>
   );
 }
 

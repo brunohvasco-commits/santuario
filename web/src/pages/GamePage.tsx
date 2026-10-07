@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CARDS, Color } from '../cards';
 import { api, Board, colorName, colorOf, Game, hasLegalMove, other, Target, targetsFor } from '../game';
@@ -73,6 +73,60 @@ export function GamePage() {
   const myTurn = !!game && game.status === 'playing' && game.turn === me;
   const mustPass = myTurn && !!game?.board && !hasLegalMove(game.board, me!, myHand);
   const nameOf = (c: Color) => (game ? (c === 'red' ? game.red_name : game.blue_name) : null) || colorName(c);
+
+  // ---- animações: só para jogadas que acontecem com a página aberta ----
+  const tableRef = useRef<HTMLElement>(null);
+  const firstSeen = useRef<{ id: string; count: number } | null>(null);
+  if (game && firstSeen.current?.id !== game.id) firstSeen.current = { id: game.id, count: game.move_count };
+  const animate = !!game && game.move_count > (firstSeen.current?.count ?? Infinity);
+  const cardRects = useRef<{ id: string; count: number; rects: Map<string, { x: number; y: number; w: number; rot: number }> } | null>(null);
+
+  useLayoutEffect(() => {
+    const root = tableRef.current;
+    if (!root || !game) return;
+    const base = root.getBoundingClientRect();
+    const now = new Map<string, { x: number; y: number; w: number; rot: number; el: HTMLElement }>();
+    root.querySelectorAll<HTMLElement>('[data-card]').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      now.set(el.dataset.card!, { x: r.left - base.left, y: r.top - base.top, w: r.width, rot: el.classList.contains('flipped') ? 180 : 0, el });
+    });
+    const prev = cardRects.current;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prev && prev.id === game.id && prev.count !== game.move_count && !reduce) {
+      // a carta usada vai primeiro para o lado; a carta do lado chega logo depois
+      const used = game.last_move?.card;
+      let i = 0;
+      now.forEach((n, id) => {
+        const p = prev.rects.get(id);
+        if (!p) return;
+        const dx = p.x - n.x;
+        const dy = p.y - n.y;
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2 && p.rot === n.rot) return;
+        const s = p.w / n.w;
+        const mid = p.rot === n.rot ? n.rot : 90;
+        const delay = id === used ? 260 : 470 + 60 * i++;
+        n.el.classList.add('flying');
+        const a = n.el.animate(
+          [
+            { transform: `perspective(900px) translate(${dx}px, ${dy}px) rotate(${p.rot}deg) scale(${s})`, filter: 'brightness(1)' },
+            {
+              transform: `perspective(900px) translate(${dx * 0.45}px, ${dy * 0.45 - 34}px) rotate(${mid}deg) rotateX(26deg) rotateY(-16deg) scale(${((s + 1) / 2) * 1.14})`,
+              filter: 'brightness(1.22) drop-shadow(0 26px 24px rgba(0,0,0,.55))',
+              offset: 0.5,
+            },
+            { transform: `perspective(900px) translate(0px, 0px) rotate(${n.rot}deg) scale(1)`, filter: 'brightness(1)' },
+          ],
+          { duration: 950, delay, easing: 'cubic-bezier(.45,.05,.2,1)', fill: 'backwards' },
+        );
+        const done = () => n.el.classList.remove('flying');
+        a.onfinish = done;
+        a.oncancel = done;
+      });
+    }
+    const rects = new Map<string, { x: number; y: number; w: number; rot: number }>();
+    now.forEach(({ el: _el, ...r }, id) => rects.set(id, r));
+    cardRects.current = { id: game.id, count: game.move_count, rects };
+  }, [game]);
 
   // limpa seleção quando o estado muda
   useEffect(() => {
@@ -219,7 +273,7 @@ export function GamePage() {
     <div className="page game-page">
       <Header onRules={() => setRules(true)} />
 
-      <main className={`table${waiting ? ' is-waiting' : ''}`}>
+      <main ref={tableRef} className={`table${waiting ? ' is-waiting' : ''}`}>
         {/* Jogador de cima (oponente) */}
         <section className={`seat top ${opp}${turnColor === opp && !finished && !waiting ? ' active' : ''}`}>
           <PlayerTag color={opp} name={waiting && !(opp === 'red' ? game.red_id : game.blue_id) ? 'Aguardando…' : nameOf(opp)} you={false} />
@@ -240,6 +294,8 @@ export function GamePage() {
             targets={targets}
             movable={(x, y) => myTurn && !mustPass && !!game.board && colorOf(game.board[y][x]) === me}
             lastMove={lm}
+            animMove={animate ? lm : null}
+            animKey={game.move_count}
             onCell={onCell}
             disabled={!myTurn || busy || mustPass}
           />
@@ -265,7 +321,7 @@ export function GamePage() {
               <p>Duas cartas levam a essa casa. Qual usar?</p>
               <div className="chooser-cards">
                 {choose.cards.map((c) => (
-                  <Card key={c} id={c} size="sm" onClick={() => doMove(c, choose)} playable />
+                  <Card key={c} id={c} size="sm" onClick={() => doMove(c, choose)} playable noTrack />
                 ))}
               </div>
               <button className="link" onClick={() => setChoose(null)}>Cancelar</button>
