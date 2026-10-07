@@ -1,0 +1,1 @@
+{"root":["./src/cards.ts","./src/game.ts","./src/main.tsx","./src/supabase.ts","./src/components/BoardView.tsx","./src/components/Card.tsx","./src/components/Piece.tsx","./src/components/Rules.tsx","./src/pages/AuthPage.tsx","./src/pages/GamePage.tsx","./src/pages/Lobby.tsx"],"version":"5.9.3"}
