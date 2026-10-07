@@ -37,6 +37,15 @@ const SETS = [
   { v: 'sensei', label: "Sensei's Path", hint: '16 cartas da expansão' },
   { v: 'all', label: 'Todas', hint: '32 cartas misturadas' },
 ];
+const OPPONENTS = [
+  { v: 'friend', label: 'Convidar amigo', hint: 'Envie um link' },
+  { v: 'ai', label: 'Contra a máquina', hint: 'Jogue agora' },
+];
+const LEVELS = [
+  { v: 'easy', label: 'Fácil', hint: 'Para aprender' },
+  { v: 'medium', label: 'Normal', hint: 'Joga com atenção' },
+  { v: 'hard', label: 'Difícil', hint: 'Não perdoa erros' },
+];
 const COLORS = [
   { v: 'random', label: 'Sorteio' },
   { v: 'red', label: 'Vermelho' },
@@ -50,6 +59,8 @@ export function Lobby() {
   const [rules, setRules] = useState(false);
   const [cardSet, setCardSet] = useState('base');
   const [color, setColor] = useState('random');
+  const [opponent, setOpponent] = useState('friend');
+  const [level, setLevel] = useState('medium');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [games, setGames] = useState<Game[] | null>(null);
@@ -83,7 +94,7 @@ export function Lobby() {
     setBusy(true);
     setErr('');
     try {
-      const id = await api.create(cardSet, color);
+      const id = opponent === 'ai' ? await api.createAi(cardSet, color, level) : await api.create(cardSet, color);
       nav(`/jogo/${id}`);
     } catch (e) {
       setErr((e as Error).message);
@@ -101,7 +112,31 @@ export function Lobby() {
       <main className="lobby">
         <section className="panel new-game">
           <h1>Novo duelo</h1>
-          <p className="muted">Crie a partida e envie o link para quem você quer desafiar.</p>
+          <p className="muted">Desafie um amigo pelo link ou treine contra a máquina.</p>
+          <fieldset>
+            <legend>Adversário</legend>
+            <div className="choices two">
+              {OPPONENTS.map((o) => (
+                <button key={o.v} className={`choice${opponent === o.v ? ' on' : ''}`} onClick={() => setOpponent(o.v)} aria-pressed={opponent === o.v}>
+                  <strong>{o.label}</strong>
+                  <small>{o.hint}</small>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          {opponent === 'ai' && (
+            <fieldset>
+              <legend>Nível da máquina</legend>
+              <div className="choices">
+                {LEVELS.map((l) => (
+                  <button key={l.v} className={`choice level-${l.v}${level === l.v ? ' on' : ''}`} onClick={() => setLevel(l.v)} aria-pressed={level === l.v}>
+                    <strong>{l.label}</strong>
+                    <small>{l.hint}</small>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <fieldset>
             <legend>Cartas de movimento</legend>
             <div className="choices">
@@ -126,7 +161,7 @@ export function Lobby() {
             <small className="muted">Quem começa é definido pela cor do símbolo da carta de lado, como no jogo de mesa.</small>
           </fieldset>
           {err && <p className="error">{err}</p>}
-          <button className="btn primary big" onClick={create} disabled={busy}>{busy ? 'Preparando o tatame…' : 'Criar partida e convidar'}</button>
+          <button className="btn primary big" onClick={create} disabled={busy}>{busy ? 'Preparando o tatame…' : opponent === 'ai' ? 'Começar contra a máquina' : 'Criar partida e convidar'}</button>
         </section>
 
         <section className="panel games">
@@ -159,7 +194,7 @@ function GameRow({ g, uid }: { g: Game; uid: string }) {
   if (g.status === 'waiting') { status = 'Aguardando oponente'; tone = 'wait'; }
   else if (g.status === 'playing') {
     const mine = g.turn === me;
-    status = mine ? 'Sua vez' : 'Vez do oponente';
+    status = mine ? 'Sua vez' : g.vs_ai ? 'Vez da máquina' : 'Vez do oponente';
     tone = mine ? 'turn' : '';
   } else if (!g.winner) { status = 'Cancelada'; }
   else { const won = g.winner === me; status = won ? 'Vitória' : 'Derrota'; tone = won ? 'win' : 'loss'; }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CARDS, Color } from '../cards';
-import { api, Board, colorName, colorOf, Game, hasLegalMove, other, Target, targetsFor } from '../game';
+import { aiColorOf, api, Board, colorName, colorOf, Game, hasLegalMove, other, Target, targetsFor } from '../game';
+import type { AiMove } from '../ai';
 import { supabase, useSession } from '../supabase';
 import { BoardView } from '../components/BoardView';
 import { Card, CardBack } from '../components/Card';
@@ -71,6 +72,8 @@ export function GamePage() {
   const myHand = (game ? (pov === 'red' ? game.red_cards : game.blue_cards) : null) ?? [];
   const oppHand = (game ? (pov === 'red' ? game.blue_cards : game.red_cards) : null) ?? [];
   const myTurn = !!game && game.status === 'playing' && game.turn === me;
+  const aiColor = game ? aiColorOf(game) : null;
+  const aiTurn = !!game && !!me && !!aiColor && game.status === 'playing' && game.turn === aiColor;
   const mustPass = myTurn && !!game?.board && !hasLegalMove(game.board, me!, myHand);
   const nameOf = (c: Color) => (game ? (c === 'red' ? game.red_name : game.blue_name) : null) || colorName(c);
 
@@ -127,6 +130,50 @@ export function GamePage() {
     now.forEach(({ el: _el, ...r }, id) => rects.set(id, r));
     cardRects.current = { id: game.id, count: game.move_count, rects };
   }, [game]);
+
+  // ---- vez da máquina: calcula no navegador (Web Worker) e o servidor valida ----
+  const workerRef = useRef<Worker | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const gameRef = useRef<Game | null>(null);
+  gameRef.current = game;
+  const aiKey = aiTurn && game ? `${game.id}:${game.move_count}` : '';
+  useEffect(() => () => workerRef.current?.terminate(), []);
+  useEffect(() => {
+    const g = gameRef.current;
+    if (!aiKey || !g?.board) return;
+    let cancelled = false;
+    setThinking(true);
+    const started = Date.now();
+    let after: number | undefined;
+    const timer = window.setTimeout(() => {
+      if (!workerRef.current) workerRef.current = new Worker(new URL('../ai.worker.ts', import.meta.url), { type: 'module' });
+      const w = workerRef.current;
+      w.onmessage = (e: MessageEvent<{ id: string; move: AiMove }>) => {
+        if (cancelled || e.data.id !== aiKey) return;
+        const m = e.data.move;
+        // tempo mínimo de "pensar" para a jogada não parecer instantânea
+        after = window.setTimeout(async () => {
+          if (cancelled) return;
+          try {
+            const res = 'pass' in m ? await api.aiMove(g.id, m.card) : await api.aiMove(g.id, m.card, m.from, m.to);
+            accept(res);
+          } catch (err) {
+            const cur = gameRef.current;
+            if (cur && cur.move_count === g.move_count) flash((err as Error).message);
+          } finally {
+            setThinking(false);
+          }
+        }, Math.max(0, 1500 - (Date.now() - started)));
+      };
+      w.postMessage({ id: aiKey, input: { board: g.board, redCards: g.red_cards, blueCards: g.blue_cards, side: g.side_card, turn: g.turn, level: g.ai_level ?? 'medium' } });
+    }, 900);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (after) window.clearTimeout(after);
+      setThinking(false);
+    };
+  }, [aiKey, accept]);
 
   // limpa seleção quando o estado muda
   useEffect(() => {
@@ -265,6 +312,7 @@ export function GamePage() {
   else if (finished) statusText = game.winner ? `${nameOf(game.winner)} venceu` : 'Partida cancelada';
   else if (spectator) statusText = `Vez de ${nameOf(turnColor!)}`;
   else if (myTurn) statusText = mustPass ? 'Sem movimentos: escolha uma carta para trocar' : selPiece ? 'Escolha o destino' : 'Sua vez: escolha uma peça';
+  else if (aiTurn) statusText = thinking ? 'A máquina está pensando…' : 'Vez da máquina';
   else statusText = `Vez de ${nameOf(turnColor!)}`;
 
   const winReason = game.win_reason === 'stone' ? 'pelo Caminho da Pedra (capturou o Mestre)' : game.win_reason === 'stream' ? 'pelo Caminho do Rio (Mestre no Templo)' : game.win_reason === 'resign' ? 'por desistência' : '';
@@ -331,7 +379,7 @@ export function GamePage() {
 
         {/* Carta de lado */}
         <aside className="side">
-          <span className="side-label">{waiting ? 'Carta de lado' : `Próxima de ${turnColor === me ? 'você' : nameOf(turnColor ?? 'red')}`}</span>
+          <span className="side-label">{waiting ? 'Carta de lado' : `Próxima ${turnColor === me ? 'de você' : turnColor === aiColor ? 'da máquina' : 'de ' + nameOf(turnColor ?? 'red')}`}</span>
           {waiting ? <CardBack size="md" /> : <Card key={game.side_card ?? "x"} id={game.side_card} size="md" flipped={turnColor !== pov} fresh />}
           {!waiting && (
             <ol className="history" aria-label="Histórico de jogadas">

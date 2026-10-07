@@ -141,6 +141,7 @@ legend { font-family: var(--hand); color: var(--bronze-hi); margin-bottom: 0.45r
   padding: 0.7rem 0.4rem; border-radius: 9px; cursor: pointer;
   border: 1px solid rgba(184, 135, 63, 0.35); background: rgba(18, 12, 8, 0.45); color: var(--text);
 }
+.choices.two { grid-template-columns: 1fr 1fr; }
 .choice small { color: var(--muted); font-size: 0.78rem; }
 .choice.on { border-color: var(--gold); background: rgba(184, 135, 63, 0.2); box-shadow: 0 0 0 1px var(--gold) inset; }
 .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--bronze-hi); flex: none; }
@@ -360,6 +361,7 @@ button.card { cursor: pointer; }
   .topbar .who { display: none; }
   .lobby { grid-template-columns: 1fr; }
   .choices { grid-template-columns: 1fr 1fr 1fr; }
+  .choices.two { grid-template-columns: 1fr 1fr; }
   .auth-page { grid-template-columns: 1fr; }
   .auth-art { display: none; }
   .auth-panel { border-left: 0; min-height: 100vh; background: linear-gradient(180deg, rgba(18, 12, 8, 0.75), rgba(18, 12, 8, 0.95)), url('/img/card-back.webp') center / cover; }

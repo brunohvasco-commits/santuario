@@ -26,6 +26,8 @@ export interface Game {
   history: LastMove[];
   move_count: number;
   rematch_id: string | null;
+  vs_ai: boolean;
+  ai_level: 'easy' | 'medium' | 'hard' | null;
 }
 
 export interface LastMove {
@@ -41,6 +43,8 @@ export interface Target { x: number; y: number; cards: string[]; capture: boolea
 
 export const other = (c: Color): Color => (c === 'red' ? 'blue' : 'red');
 export const colorOf = (cell: Cell): Color | null => (cell ? (cell[0] === 'r' ? 'red' : 'blue') : null);
+export const aiColorOf = (g: Game): Color | null => (g.vs_ai ? (g.red_id ? 'blue' : 'red') : null);
+export const LEVEL_NAME = { easy: 'Fácil', medium: 'Normal', hard: 'Difícil' } as const;
 export const colorName = (c: Color) => (c === 'red' ? 'Vermelho' : 'Azul');
 
 /** Destinos possíveis para a peça em (x,y) usando as cartas da mão. Mesma regra validada no servidor. */
@@ -85,6 +89,10 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 
 export const api = {
   create: (cardSet: string, color: string) => rpc<string>('create_game', { p_card_set: cardSet, p_color: color }),
+  createAi: (cardSet: string, color: string, level: string) =>
+    rpc<string>('create_ai_game', { p_card_set: cardSet, p_color: color, p_level: level }),
+  aiMove: (id: string, card: string, from?: [number, number], to?: [number, number]) =>
+    rpc<Game>('ai_move', from && to ? { p_game: id, p_card: card, fx: from[0], fy: from[1], tx: to[0], ty: to[1] } : { p_game: id, p_card: card }),
   join: (id: string) => rpc<Game>('join_game', { p_game: id }),
   move: (id: string, card: string, fx: number, fy: number, tx: number, ty: number) =>
     rpc<Game>('make_move', { p_game: id, p_card: card, fx, fy, tx, ty }),
